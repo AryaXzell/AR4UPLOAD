@@ -1,0 +1,15 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap');
+
+body { 
+    font-family: 'Inter', sans-serif; 
+}
+
+.drop-zone { 
+    border: 2px dashed #e2e8f0; 
+    transition: all 0.3s ease; 
+}
+
+.drop-zone.active { 
+    border-color: #3b82f6; 
+    background-color: #eff6ff; 
+}
