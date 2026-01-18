@@ -1,15 +1,35 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap');
+/* custom font & base */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
 
-body { 
-    font-family: 'Inter', sans-serif; 
+body {
+    background-color: #020617;
+    color: #f8fafc;
+    font-family: 'Inter', sans-serif;
 }
 
-.drop-zone { 
-    border: 2px dashed #e2e8f0; 
-    transition: all 0.3s ease; 
+/* box upload pake border putus-putus custom svg */
+.upload-box {
+    background-image: url("data:image/svg+xml,%3csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='100%25' height='100%25' fill='none' rx='16' ry='16' stroke='%236366F1FF' stroke-width='2' stroke-dasharray='12%2c 12' stroke-dashoffset='0' stroke-linecap='square'/%3e%3c/svg%3e");
+    transition: all 0.3s ease;
 }
 
-.drop-zone.active { 
-    border-color: #3b82f6; 
-    background-color: #eff6ff; 
+.upload-box:hover, .upload-box.dragover {
+    background-color: rgba(99, 102, 241, 0.12);
+    transform: scale(1.015);
+    cursor: pointer;
+}
+
+.uploading {
+    cursor: wait !important;
+    opacity: 0.75;
+}
+
+/* animasi bounce yang lebih santai */
+@keyframes bounce-slow {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+}
+
+.animate-bounce-slow {
+    animation: bounce-slow 3s infinite;
 }
