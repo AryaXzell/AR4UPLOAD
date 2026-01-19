@@ -3,7 +3,7 @@
 
 <div align="center">
 
-![GitHub stars](https://img.shields.io/github/stars/username/ar4upload?style=for-the-badge&color=6366f1)
+![GitHub stars](https://img.shields.io/github/stars/AryaXzell/ar4upload?style=for-the-badge&color=6366f1)
 ![Supabase](https://img.shields.io/badge/Storage-Supabase-3EC988?style=for-the-badge&logo=supabase&logoColor=white)
 ![TailwindCSS](https://img.shields.io/badge/UI-Tailwind_CSS-06B6D4?style=for-the-badge&logo=tailwind-css&logoColor=white)
 ![No Login](https://img.shields.io/badge/Access-No_Login-f8fafc?style=for-the-badge)
