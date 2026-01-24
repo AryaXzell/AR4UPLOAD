@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AR4UPLOAD - History & Preview</title>
+    <title>AR4UPLOAD - SIMPLE UPLOADER</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -68,9 +68,9 @@
         <div class="bg-card/80 backdrop-blur-md p-6 sm:p-8 rounded-3xl shadow-2xl border border-slate-700/50 z-10">
             <div class="text-center mb-6">
                 <h1 class="text-2xl font-black tracking-tighter text-white mb-1">
-                    AR4<span class="text-accent">UPLOAD</span> <span class="text-xs font-normal text-slate-500 ml-1">v2.0</span>
+                    AR4<span class="text-accent">UPLOAD</span> <span class="text-xs font-normal text-slate-500 ml-1">v2.1 Realtime</span>
                 </h1>
-                <p class="text-slate-400 text-xs">Simpel. Cepat. Ada riwayatnya.</p>
+                <p class="text-slate-400 text-xs">Simpel. Cepat. No Tipu-Tipu.</p>
             </div>
 
             <div id="config-warning" class="hidden mb-5 p-4 bg-red-500/10 border border-red-500/40 rounded-xl flex items-start gap-3 text-sm">
@@ -109,7 +109,7 @@
                         <span id="progress-percent">0%</span>
                     </div>
                     <div class="w-full bg-slate-700 h-2.5 rounded-full overflow-hidden shadow-inner">
-                        <div id="progress-bar" class="h-full bg-gradient-to-r from-accent to-purple-600 w-0 transition-all duration-200 ease-out"></div>
+                        <div id="progress-bar" class="h-full bg-gradient-to-r from-accent to-purple-600 w-0 transition-all duration-75 ease-linear"></div>
                     </div>
                 </div>
             </div>
@@ -224,6 +224,9 @@
             if (e.target.files.length) handleFiles(e.target.files[0]);
         });
 
+        // ---------------------------------------------------------
+        // REALTIME UPLOAD LOGIC (XHR Version)
+        // ---------------------------------------------------------
         async function handleFiles(file) {
             if (isUploading) return;
             if (!supabaseClient) return showToast('Config Supabase belum lengkap', 'error');
@@ -244,76 +247,105 @@
             const uniqueName = `${crypto.randomUUID()}.${fileExt}`;
             const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(fileExt);
 
-            let progressInterval;
-            try {
-                // Fake smooth progress for UX
-                let fakeProg = 0;
-                progressInterval = setInterval(() => {
-                    if (fakeProg >= 90) {
-                        fakeProg += (100 - fakeProg) * 0.1;
-                    } else {
-                        fakeProg += 3 + Math.random() * 5;
+            // Kita pakai Promise biar bisa handle async flow-nya manual
+            return new Promise((resolve, reject) => {
+                const xhr = new XMLHttpRequest();
+                // Direct endpoint ke Storage API Supabase
+                const uploadUrl = `${SUPABASE_URL}/storage/v1/object/${BUCKET_NAME}/${uniqueName}`;
+                
+                xhr.open('POST', uploadUrl);
+                
+                // Headers wajib buat Supabase Storage
+                xhr.setRequestHeader('Authorization', `Bearer ${SUPABASE_KEY}`);
+                xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+                xhr.setRequestHeader('x-upsert', 'false'); // Jangan timpa file kalo ada nama sama (walau udah pake UUID sih)
+
+                // Event listener progress ASLI
+                xhr.upload.onprogress = (e) => {
+                    if (e.lengthComputable) {
+                        const percent = (e.loaded / e.total) * 100;
+                        updateProgressUI(percent);
+                        
+                        // Update text status realtime
+                        const loaded = formatBytes(e.loaded);
+                        const total = formatBytes(e.total);
+                        document.getElementById('status-text').innerText = `${loaded} / ${total}`;
                     }
-                    fakeProg = Math.min(fakeProg, 90);
-                    updateProgressUI(fakeProg);
-                }, 150);
+                };
 
-                const { data, error } = await supabaseClient.storage
-                    .from(BUCKET_NAME)
-                    .upload(uniqueName, file, {
-                        cacheControl: '3600',
-                        upsert: false
-                    });
+                xhr.onload = () => {
+                    if (xhr.status >= 200 && xhr.status < 300) {
+                        // SUKSES
+                        const { data } = supabaseClient.storage
+                            .from(BUCKET_NAME)
+                            .getPublicUrl(uniqueName);
 
-                clearInterval(progressInterval);
+                        const publicUrl = data.publicUrl;
 
-                if (error) throw error;
+                        saveToHistory({
+                            name: file.name,
+                            size: formatBytes(file.size),
+                            url: publicUrl,
+                            date: new Date().toLocaleString('id-ID'),
+                            type: fileExt,
+                            isImage: isImage
+                        });
 
-                updateProgressUI(100);
+                        setTimeout(() => {
+                            resultLink.value = publicUrl;
+                            
+                            if (isImage) {
+                                previewContainer.classList.remove('hidden');
+                                imagePreview.src = publicUrl;
+                            } else {
+                                previewContainer.classList.add('hidden');
+                                imagePreview.src = '';
+                            }
 
-                const { data: urlData } = supabaseClient.storage
-                    .from(BUCKET_NAME)
-                    .getPublicUrl(uniqueName);
-
-                const publicUrl = urlData.publicUrl;
-
-                // Save to History
-                saveToHistory({
-                    name: file.name,
-                    size: formatBytes(file.size),
-                    url: publicUrl,
-                    date: new Date().toLocaleString('id-ID'),
-                    type: fileExt,
-                    isImage: isImage
-                });
-
-                setTimeout(() => {
-                    resultLink.value = publicUrl;
-                    
-                    // Handle Preview
-                    if (isImage) {
-                        previewContainer.classList.remove('hidden');
-                        imagePreview.src = publicUrl;
+                            updateView('result');
+                            showToast('Mantap, berhasil!', 'success');
+                            cleanup();
+                            resolve();
+                        }, 500); // Delay dikit biar enak liat 100%
                     } else {
-                        previewContainer.classList.add('hidden');
-                        imagePreview.src = '';
+                        // ERROR DARI SERVER
+                        try {
+                            const errResp = JSON.parse(xhr.responseText);
+                            handleError(errResp);
+                        } catch (e) {
+                            handleError({ message: xhr.statusText });
+                        }
+                        reject();
                     }
+                };
 
-                    updateView('result');
-                    showToast('Mantap, berhasil!', 'success');
-                }, 600);
+                xhr.onerror = () => {
+                    handleError({ message: 'Network Error / Koneksi Putus' });
+                    reject();
+                };
 
-            } catch (err) {
-                console.error('Upload failed:', err);
-                clearInterval(progressInterval);
+                // Sikat!
+                xhr.send(file);
+            });
+
+            function handleError(err) {
+                console.error('Upload error:', err);
                 let msg = 'Yah gagal... coba lagi';
+                
+                // Cek error message umum
                 if (err.message?.includes('size')) msg = 'File kegedean bos';
-                else if (err.message?.includes('permission')) msg = 'Izin ditolak (cek config)';
+                else if (err.message?.includes('permission') || err.statusCode === '401') msg = 'Izin ditolak (Cek RLS Policy Supabase)';
+                else if (err.error === 'Duplicate') msg = 'File duplikat (jarang terjadi sih)';
+                
                 showToast(msg, 'error');
                 setTimeout(() => updateView('upload'), 2000);
-            } finally {
+                cleanup();
+            }
+
+            function cleanup() {
                 isUploading = false;
                 dropZone.classList.remove('uploading');
+                document.getElementById('status-text').innerText = 'Mengunggah...';
             }
         }
 
@@ -327,8 +359,8 @@
 
         function saveToHistory(item) {
             const h = getHistory();
-            h.unshift(item); // Add to top
-            if (h.length > 20) h.pop(); // Keep only last 20
+            h.unshift(item); 
+            if (h.length > 20) h.pop(); 
             localStorage.setItem('ar4upload_history', JSON.stringify(h));
             renderHistory();
         }
@@ -385,15 +417,13 @@
         }
 
         // ==========================================
-        // COPY LINK (FIXED/ROBUST VERSION)
+        // COPY LINK
         // ==========================================
         async function copyLink(url) {
             try {
-                // Cara Modern
                 await navigator.clipboard.writeText(url);
                 showToast('Link dicopy!', 'success');
             } catch (err) {
-                // Cara Tradisional (Fallback)
                 const textArea = document.createElement("textarea");
                 textArea.value = url;
                 textArea.style.position = "fixed";
@@ -401,15 +431,12 @@
                 document.body.appendChild(textArea);
                 textArea.focus();
                 textArea.select();
-                
                 try {
                     document.execCommand('copy');
                     showToast('Link dicopy!', 'success');
                 } catch (e) {
-                    console.error('Copy failed', e);
                     showToast('Gagal copy otomatis', 'error');
                 }
-                
                 document.body.removeChild(textArea);
             }
         }
